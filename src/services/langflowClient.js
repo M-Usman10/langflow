@@ -32,15 +32,20 @@ export class LangflowClient {
 
     async makeRequest(endpoint, body) {
         const cleanEndpoint = endpoint.replace('/langflow-api', '');
-        const url = ${LANGFLOW_BASE_URL}${cleanEndpoint};
+        const url = `${LANGFLOW_BASE_URL}${cleanEndpoint}`;
 
-        console.log('Making request to:', url);
+        console.log('Making request to URL:', url);
         console.log('Request body:', body);
 
         const headers = {
             "x-api-key": this.applicationToken, // Updated to use x-api-key
             "Content-Type": "application/json"
         };
+
+        if (typeof body !== 'object') {
+            console.error("Invalid body passed to makeRequest. Expected an object:", body);
+            throw new Error("Invalid body passed to makeRequest. It must be an object.");
+        }
 
         try {
             const response = await fetch(url, {
@@ -53,18 +58,23 @@ export class LangflowClient {
 
             if (!response.ok) {
                 const errorData = await response.json();
-                throw new Error(${response.status} ${response.statusText} - ${JSON.stringify(errorData)});
+                console.error('Response returned an error:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    errorData
+                });
+                throw new Error(`${response.status} ${response.statusText} - ${JSON.stringify(errorData)}`);
             }
 
             return await response.json();
         } catch (error) {
-            console.error('Request failed:', error);
+            console.error('Error during request execution:', error);
             throw error;
         }
     }
 
     async initiateSession(flowId, langflowId, inputValue, history = [], inputType = 'chat', outputType = 'chat', stream = false, tweaks = {}) {
-        const endpoint = /lf/${langflowId}/api/v1/run/${flowId}?stream=${stream};
+        const endpoint = `/lf/${langflowId}/api/v1/run/${flowId}?stream=${stream}`;
 
         const updatedTweaks = {
             ...tweaks,
@@ -97,13 +107,13 @@ export class LangflowClient {
 
     async handleStream(langflowId, streamUrl, onUpdate, onClose, onError) {
         const url = import.meta.env.PROD
-            ? ${LANGFLOW_BASE_URL}/lf/${langflowId}${streamUrl}
-            : /langflow-api/lf/${langflowId}${streamUrl};
+            ? `${LANGFLOW_BASE_URL}/lf/${langflowId}${streamUrl}`
+            : `/langflow-api/lf/${langflowId}${streamUrl}`;
 
         try {
             const response = await fetch(url, {
                 headers: {
-                    'x-api-key': this.applicationToken, // Updated to use x-api-key
+                    'x-api-key': this.applicationToken,
                     'Accept': 'text/event-stream',
                     'Cache-Control': 'no-cache',
                     'Connection': 'keep-alive'
@@ -118,7 +128,7 @@ export class LangflowClient {
                     body: errorText,
                     url
                 });
-                throw new Error(Stream request failed: ${response.status} ${response.statusText});
+                throw new Error(`Stream request failed: ${response.status} ${response.statusText}`);
             }
 
             const reader = response.body.getReader();
